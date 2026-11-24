@@ -1,88 +1,330 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>سجل حديد PPL</title>
+<title>حديد – حاسبة التمارين الذكية</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,Tahoma,sans-serif;background:#0f1115;color:#eee}
-header{padding:14px;text-align:center;font-size:20px;font-weight:700;background:#171a21}
-.tabs{display:flex;gap:6px;padding:10px}.tabs button{flex:1;padding:12px;border:0;border-radius:10px;background:#222733;color:#eee;font-size:16px}
-.tabs button.on{background:#e63946}
-main{padding:0 10px 40px;max-width:640px;margin:auto}
+header{padding:12px;text-align:center;font-size:19px;font-weight:700;background:#171a21}
+.nav{display:flex;gap:4px;padding:8px;position:sticky;top:0;background:#0f1115;z-index:5}
+.nav button,.chips button{flex:1;padding:10px 4px;border:0;border-radius:10px;background:#222733;color:#eee;font-size:14px}
+.nav button.on,.chips button.on{background:#e63946}
+main{padding:0 10px 60px;max-width:680px;margin:auto}
 .card{background:#171a21;border-radius:14px;padding:12px;margin:10px 0}
-.card h3{margin:0 0 4px}.sug{color:#7bdc8b;font-size:14px;margin-bottom:8px}.last{color:#999;font-size:13px}
-.row{display:flex;gap:6px;align-items:center;margin:5px 0}.row span{width:24px;color:#999}
-input{width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#0f1115;color:#eee;font-size:16px}
-.btn{padding:10px 14px;border:0;border-radius:10px;background:#2a9d8f;color:#fff;font-size:15px;margin-top:6px}
-.btn.g{background:#333}.done{opacity:.55}
+.card h3{margin:0 0 4px;font-size:16px}.sug{color:#7bdc8b;font-size:14px;margin:6px 0}.last,.muted{color:#999;font-size:13px}
+.warn{color:#f4a261;font-size:13px}
+.row{display:flex;gap:6px;align-items:center;margin:5px 0}.row span{width:24px;color:#999}.row label{min-width:110px;font-size:14px}
+input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#0f1115;color:#eee;font-size:16px}
+.btn{padding:10px 14px;border:0;border-radius:10px;background:#2a9d8f;color:#fff;font-size:15px;margin:6px 4px 0 0}
+.btn.g{background:#333}.btn.r{background:#9d2a2a}.done{border:1px solid #2a9d8f}
+.ex{display:flex;gap:10px;align-items:center}.ex img{width:84px;height:84px;object-fit:cover;border-radius:10px;background:#fff;flex:none}
+.big img{width:100%;height:auto;max-height:260px;object-fit:contain}
+.badge{display:inline-block;font-size:11px;background:#222733;border-radius:6px;padding:2px 6px;margin:2px 0 0 4px;color:#bbb}
 canvas{width:100%;height:150px;background:#0f1115;border-radius:8px;margin-top:8px}
-.top{display:flex;gap:6px;flex-wrap:wrap}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{border-bottom:1px solid #2a2f3a;padding:6px 4px;text-align:right}
+th{color:#e63946}.hide{display:none}.chips{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}.chips button{flex:none;padding:6px 10px;font-size:13px}
+ol{padding-right:18px;font-size:13px;color:#ccc}
 </style></head><body>
-<header>🏋️ سجل التمارين – PPL</header>
-<div class="tabs" id="tabs"></div>
+<header>🏋️ حديد – حاسبة التمارين الذكية</header>
+<div class="nav" id="nav"></div>
 <main id="app"></main>
-<main>
-<div class="card"><b>الإعدادات</b>
-<div class="row"><label>الحد الأدنى للتكرار</label><input id="rmin" type="number"></div>
-<div class="row"><label>الحد الأعلى للتكرار</label><input id="rmax" type="number"></div>
-<div class="row"><label>الزيادة (كجم)</label><input id="inc" type="number" step="0.5"></div>
-<div class="row"><label>عدد المجموعات</label><input id="nsets" type="number"></div>
-<div class="top"><button class="btn" onclick="saveCfg()">حفظ الإعدادات</button>
-<button class="btn g" onclick="exportData()">تصدير نسخة</button>
-<button class="btn g" onclick="document.getElementById('imp').click()">استيراد</button>
-<input type="file" id="imp" hidden onchange="importData(event)"></div></div>
-</main>
 <script>
-const DEF={
-Push:["Bench Press","Incline Dumbbell Press","Shoulder Press","Lateral Raise","Triceps Pushdown","Overhead Triceps Extension"],
-Pull:["Lat Pulldown","Barbell Row","Seated Cable Row","Face Pull","Barbell Curl","Hammer Curl"],
-Legs:["Squat","Romanian Deadlift","Leg Press","Leg Curl","Leg Extension","Calf Raise"]};
-const AR={Push:"دفع",Pull:"سحب",Legs:"أرجل"};
-let S=JSON.parse(localStorage.getItem("ppl")||"null")||{cfg:{rmin:8,rmax:12,inc:2.5,nsets:3},log:{},day:"Push"};
-const save=()=>localStorage.setItem("ppl",JSON.stringify(S));
+const DB_URL="https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json";
+const IMG="https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/";
+const KEY="hadeed2";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let DB=[],BYID={},dbState="loading";
+let S=JSON.parse(localStorage.getItem(KEY)||"null")||{profile:null,sel:{},log:{},days:["Push","Pull","Legs"],day:"Push",cfg:{rmin:8,rmax:12,inc:2.5,nsets:3},bw:[],inbody:null};
+let UI={tab:"today",step:1,q:"",eq:"",mu:"",lim:40,prog:null};
+const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
 const today=()=>new Date().toISOString().slice(0,10);
-function hist(ex){return (S.log[ex]||[]).slice().sort((a,b)=>a.date<b.date?-1:1)}
-function suggest(ex){
- const h=hist(ex).filter(x=>x.date!==today());const c=S.cfg;
- if(!h.length)return{w:"",msg:"أول مرة: ابدأ بوزن تقدر تعمل به "+c.rmin+" تكرارات بشكل نظيف"};
- const l=h[h.length-1],sets=l.sets,w=Math.max(...sets.map(s=>s.w));
- const top=sets.filter(s=>s.w===w);
- if(top.every(s=>s.r>=c.rmax))return{w:w+c.inc,msg:`زد الوزن إلى ${w+c.inc} كجم (وصلت ${c.rmax} في كل المجموعات)`};
- if(top.some(s=>s.r<c.rmin)&&top.filter(s=>s.r<c.rmin).length>=2)return{w:w,msg:`ثبّت على ${w} كجم وحاول توصل ${c.rmin}+ في كل مجموعة`};
- return{w:w,msg:`ابقَ على ${w} كجم وحاول ترفع التكرارات حتى ${c.rmax}`};
+const rnd=(x,s)=>Math.round(x/s)*s;
+const EQ={"machine":"جهاز","cable":"كيبل","barbell":"بار","dumbbell":"دمبل","body only":"وزن الجسم","kettlebells":"كيتل بيل","bands":"أحبال مطاط","e-z curl bar":"بار EZ","exercise ball":"كرة","medicine ball":"كرة طبية","foam roll":"فوم رول","other":"أخرى"};
+const MU=["chest","shoulders","triceps","lats","middle back","lower back","traps","biceps","forearms","quadriceps","hamstrings","glutes","calves","adductors","abductors","abdominals","neck"];
+const eqName=e=>e?(EQ[e]||e):"غير محدد";
+function autoDay(ex){
+ if(S.days.join()!=="Push,Pull,Legs")return S.days[0];
+ const m=(ex.primaryMuscles||[])[0]||"";
+ if(["chest","shoulders","triceps"].includes(m))return"Push";
+ if(["lats","middle back","lower back","traps","biceps","forearms","neck"].includes(m))return"Pull";
+ return"Legs";
 }
+async function loadDB(){
+ try{const r=await fetch(DB_URL);DB=await r.json();DB.forEach(e=>BYID[e.id]=e);dbState="ok"}catch(e){dbState="err"}
+ render();
+}
+const hist=id=>(S.log[id]||[]).slice().sort((a,b)=>a.date<b.date?-1:1);
+const e1=(w,r)=>w*(1+r/30);
+const rng=id=>{const s=S.sel[id]||{};return{min:s.rmin||S.cfg.rmin,max:s.rmax||S.cfg.rmax,n:s.sets||S.cfg.nsets,inc:s.inc||S.cfg.inc}};
+const lastBW=()=>S.bw.length?S.bw[S.bw.length-1].w:(S.profile?S.profile.weight:70);
+
+const RATIOS=[[/leg curl/,.4],[/leg extension/,.5],[/leg press/,1.8],[/romanian|stiff/,1.0],[/deadlift/,1.3],[/squat/,1.0],[/lunge|split squat/,.5],[/hip thrust|glute bridge/,1.2],[/calf/,1.0],
+[/incline/,.6],[/bench press|chest press/,.75],[/fly|flye|crossover|pec deck/,.25],[/shoulder press|overhead press|military|arnold/,.5],[/lateral raise|front raise|rear delt|reverse fly/,.1],
+[/face pull/,.25],[/shrug/,.7],[/pulldown|pull-down|lat pull/,.65],[/row/,.6],[/skull|pushdown|triceps|tricep|extension/,.3],[/curl/,.3],[/dip/,.3]];
+function estimate(id){
+ const ex=BYID[id],p=S.profile,n=ex.name.toLowerCase();
+ let ratio=null;for(const [re,r] of RATIOS)if(re.test(n)){ratio=r;break}
+ if(ratio==null)ratio=ex.mechanic==="isolation"?.2:.5;
+ let bw=lastBW(),f=1;
+ f*= p.sex==="f"?.6:1;
+ f*= p.age>35?Math.max(.6,1-(p.age-35)*.007):1;
+ if(S.inbody&&S.inbody.smm&&S.inbody.weight){const ref=p.sex==="f"?.33:.40;f*=Math.min(1.2,Math.max(.8,(S.inbody.smm/S.inbody.weight)/ref))}
+ if(ex.equipment==="dumbbell"||ex.equipment==="kettlebells")f*=.5;
+ if(ex.equipment==="cable")f*=.8;
+ if(ex.equipment==="body only")return 0;
+ return bw*ratio*f;
+}
+function suggest(id){
+ const s=S.sel[id],g=rng(id),ex=BYID[id],bwOnly=ex&&ex.equipment==="body only";
+ const h=hist(id).filter(x=>x.date!==today());
+ if(h.length){
+  const l=h[h.length-1],w=Math.max(...l.sets.map(x=>x.w)),top=l.sets.filter(x=>x.w===w);
+  const e=Math.round(e1(w,Math.max(...top.map(x=>x.r))));
+  if(top.every(x=>x.r>=g.max))return{w:w+g.inc,msg:`زد الوزن إلى ${w+g.inc} كجم – وصلت ${g.max} تكرار في كل المجموعات (1RM تقديري ≈ ${e} كجم)`};
+  const low=top.filter(x=>x.r<g.min).length;
+  if(low>=2){
+   const p=h[h.length-2];
+   if(p&&Math.max(...p.sets.map(x=>x.w))===w&&p.sets.filter(x=>x.w===w&&x.r<g.min).length>=2){const d=Math.max(0,rnd(w*.9,g.inc));return{w:d,msg:`تعثرت جلستين متتاليتين: خفّف إلى ${d} كجم (حوالي 10%) وارجع تتقدم تدريجيًا`}}
+   return{w,msg:`ثبّت على ${w} كجم وحاول تصل ${g.min}+ في كل مجموعة`};
+  }
+  return{w,msg:`ابقَ على ${w} كجم وحاول ترفع التكرارات حتى ${g.max} (1RM تقديري ≈ ${e} كجم)`};
+ }
+ if(bwOnly)return{w:0,msg:`تمرين بوزن الجسم: ابدأ بـ 0 كجم وحاول توصل ${g.max} تكرار قبل إضافة وزن`};
+ if(s&&s.w0>0&&s.r0>0){
+  if(s.r0>=g.min&&s.r0<=g.max)return{w:s.w0,msg:`ابدأ بوزنك المسجل ${s.w0} كجم × ${s.r0}`};
+  const w=Math.max(g.inc,rnd(e1(s.w0,s.r0)/(1+(g.min+2)/30),g.inc));
+  return{w,msg:`محسوب من ${s.w0} كجم × ${s.r0} (1RM ≈ ${Math.round(e1(s.w0,s.r0))} كجم) لتناسب ${g.min}-${g.max} تكرار`};
+ }
+ const est=estimate(id),w=Math.max(g.inc,rnd(est*.6,g.inc));
+ return{w,msg:`تقدير مبدئي من وزنك وعمرك وجنسك${S.inbody?" ونتائج InBody":""}. ابدأ به بحذر وعدّل بعد أول جلسة`,est:true};
+}
+const BMI=()=>{const p=S.profile;return p?(lastBW()/Math.pow(p.height/100,2)):0};
+
+let anim=0;
+setInterval(()=>{anim^=1;document.querySelectorAll("img.anim").forEach(i=>{i.src=IMG+i.dataset.b+"/"+anim+".jpg"})},800);
+const imgTag=(id,big)=>{const e=BYID[id];return e?`<img class="anim" loading="lazy" data-b="${esc(e.id)}" src="${IMG}${esc(e.id)}/0.jpg" alt="">`:""};
+
 function render(){
- document.getElementById("tabs").innerHTML=Object.keys(DEF).map(d=>`<button class="${S.day==d?'on':''}" onclick="S.day='${d}';save();render()">${AR[d]} (${d})</button>`).join("");
- const c=S.cfg;let h="";
- DEF[S.day].forEach((ex,i)=>{
-  const sg=suggest(ex),l=hist(ex).slice(-1)[0];
-  const done=(S.log[ex]||[]).some(x=>x.date===today());
-  let rows="";for(let k=0;k<c.nsets;k++)rows+=`<div class="row"><span>${k+1}</span><input id="w${i}_${k}" type="number" step="0.5" placeholder="كجم" value="${sg.w}"><input id="r${i}_${k}" type="number" placeholder="تكرار (${c.rmin}-${c.rmax})"></div>`;
-  h+=`<div class="card ${done?'done':''}"><h3>${ex}</h3><div class="sug">${sg.msg}</div>
-  <div class="last">${l?'آخر مرة ('+l.date+'): '+l.sets.map(s=>s.w+'×'+s.r).join(' | '):''}</div>
-  ${rows}<button class="btn" onclick="logEx(${i})">${done?'تحديث اليوم':'حفظ'}</button>
-  <button class="btn g" onclick="chart(${i})">الرسم</button><canvas id="c${i}" hidden></canvas></div>`;
+ $("#nav").innerHTML=!S.profile?"":[["today","اليوم"],["lib","التمارين"],["me","ملفي"],["inb","InBody"]].map(t=>`<button class="${UI.tab==t[0]?'on':''}" onclick="UI.tab='${t[0]}';render()">${t[1]}</button>`).join("");
+ if(dbState==="loading"){$("#app").innerHTML='<div class="card">جاري تحميل قاعدة التمارين (800+ تمرين)...</div>';return}
+ if(dbState==="err"){$("#app").innerHTML='<div class="card warn">تعذر تحميل قاعدة التمارين. تأكد من الاتصال بالإنترنت ثم حدّث الصفحة.</div>';return}
+ if(!S.profile||UI.step>1&&UI.ob){return onboard()}
+ ({today:vToday,lib:vLib,me:vMe,inb:vInb})[UI.tab]();
+}
+function onboard(){
+ const a=$("#app");
+ if(!S.profile&&UI.step===1){
+  a.innerHTML=`<div class="card"><h3>مرحبًا 👋 الخطوة 1: بياناتك</h3><div class="muted">تُستخدم لحساب الأوزان المقترحة وتبقى في جهازك فقط.</div>
+  <div class="row"><label>الجنس</label><select id="p_sex"><option value="m">ذكر</option><option value="f">أنثى</option></select></div>
+  <div class="row"><label>العمر</label><input id="p_age" type="number" value="25"></div>
+  <div class="row"><label>الطول (سم)</label><input id="p_h" type="number" value="175"></div>
+  <div class="row"><label>الوزن (كجم)</label><input id="p_w" type="number" step="0.1" value="75"></div>
+  <button class="btn" onclick="obNext()">التالي</button></div>`;return}
+ if(UI.step===2){
+  a.innerHTML=`<div class="card"><h3>الخطوة 2: اختر تمارينك وأجهزتك</h3><div class="muted">علّم فقط ما تتمرن عليه. تقدر تضيف أو تحذف لاحقًا.</div>${libFilters()}<div id="lib"></div>
+  <button class="btn" onclick="UI.step=3;render()">التالي (<span id="cnt">${Object.keys(S.sel).length}</span> تمرين)</button></div>`;fillLib();return}
+ if(UI.step===3){
+  const ids=Object.keys(S.sel);
+  a.innerHTML=`<div class="card"><h3>الخطوة 3: أوزانك الحالية</h3><div class="muted">اكتب أعلى وزن ترفعه بتكرارات مناسبة (مثال: 60 كجم × 10). اتركه فارغًا ليُقدّر لك تلقائيًا.</div>
+  ${ids.map(id=>{const e=BYID[id];return `<div class="row ex" style="margin:10px 0">${imgTag(id)}<div style="flex:1"><b>${esc(e.name)}</b><span class="badge">${eqName(e.equipment)}</span>
+  <div class="row"><input id="w0_${esc(id)}" type="number" step="0.5" placeholder="كجم" value="${S.sel[id].w0||''}"><input id="r0_${esc(id)}" type="number" placeholder="تكرار" value="${S.sel[id].r0||''}"></div></div></div>`}).join("")||'<div class="warn">ما اخترت أي تمرين.</div>'}
+  <button class="btn g" onclick="UI.step=2;render()">رجوع</button><button class="btn" onclick="obDone()">ابدأ</button></div>`;
+ }
+}
+function obNext(){
+ S.profile={sex:$("#p_sex").value,age:+$("#p_age").value||25,height:+$("#p_h").value||175,weight:+$("#p_w").value||75};
+ S.bw=[{date:today(),w:S.profile.weight}];UI.ob=true;UI.step=2;save();render();
+}
+function obDone(){
+ Object.keys(S.sel).forEach(id=>{const w=parseFloat(document.getElementById("w0_"+id).value),r=parseInt(document.getElementById("r0_"+id).value);S.sel[id].w0=w>0?w:0;S.sel[id].r0=r>0?r:0});
+ UI.ob=false;UI.step=1;UI.tab="today";S.day=S.days[0];save();render();
+}
+function libFilters(){
+ return `<input placeholder="ابحث بالاسم (English)" value="${esc(UI.q)}" oninput="UI.q=this.value;UI.lim=40;fillLib()">
+ <div class="row"><select onchange="UI.eq=this.value;UI.lim=40;fillLib()"><option value="">كل الأجهزة/الأدوات</option>${Object.keys(EQ).map(k=>`<option value="${k}" ${UI.eq==k?'selected':''}>${EQ[k]} (${k})</option>`).join("")}</select>
+ <select onchange="UI.mu=this.value;UI.lim=40;fillLib()"><option value="">كل العضلات</option>${MU.map(m=>`<option ${UI.mu==m?'selected':''}>${m}</option>`).join("")}</select></div>`;
+}
+function fillLib(){
+ const q=UI.q.toLowerCase();
+ const list=DB.filter(e=>(!UI.eq||e.equipment===UI.eq)&&(!UI.mu||(e.primaryMuscles||[]).includes(UI.mu))&&(!q||e.name.toLowerCase().includes(q))&&e.category!=="stretching");
+ const el=$("#lib");if(!el)return;
+ el.innerHTML=`<div class="muted">${list.length} تمرين</div>`+list.slice(0,UI.lim).map(e=>`<div class="row ex" style="margin:8px 0">${imgTag(e.id)}<div style="flex:1"><b>${esc(e.name)}</b><br><span class="badge">${eqName(e.equipment)}</span><span class="badge">${esc((e.primaryMuscles||[]).join(", "))}</span></div>
+  <input type="checkbox" style="width:26px;height:26px" data-id="${esc(e.id)}" ${S.sel[e.id]?'checked':''} onchange="toggle(this)"></div>`).join("")+(list.length>UI.lim?`<button class="btn g" onclick="UI.lim+=40;fillLib()">عرض المزيد</button>`:"");
+}
+function toggle(el){
+ const id=el.dataset.id;
+ if(el.checked)S.sel[id]=S.sel[id]||{day:autoDay(BYID[id]),w0:0,r0:0};else delete S.sel[id];
+ save();const c=$("#cnt");if(c)c.textContent=Object.keys(S.sel).length;
+}
+function vLib(){
+ $("#app").innerHTML=`<div class="card"><h3>مكتبة التمارين</h3><div class="muted">علّم التمارين التي تناسبك، وأزل علامة ما لا يناسبك لحذفه من جدولك. الصور تتحرك بين وضعي البداية والنهاية كمرجع للتكنيك.</div>${libFilters()}<div id="lib"></div></div>`;fillLib();
+}
+function vToday(){
+ if(!S.days.includes(S.day))S.day=S.days[0];
+ const ids=Object.keys(S.sel).filter(id=>BYID[id]&&(S.sel[id].day||S.days[0])===S.day||BYID[id]&&!S.days.includes(S.sel[id].day)&&S.day===S.days[0]);
+ window.CUR=ids;
+ let h=`<div class="chips">${S.days.map(d=>`<button class="${S.day==d?'on':''}" onclick="S.day='${esc(d)}';save();render()">${esc(d)}</button>`).join("")}</div>`;
+ if(!ids.length)h+='<div class="card">لا توجد تمارين في هذا اليوم. أضف من تبويب "التمارين".</div>';
+ ids.forEach((id,i)=>{
+  const e=BYID[id],sg=suggest(id),g=rng(id),l=hist(id).slice(-1)[0],done=(S.log[id]||[]).some(x=>x.date===today()),s=S.sel[id];
+  let rows="";for(let k=0;k<g.n;k++)rows+=`<div class="row"><span>${k+1}</span><input id="w${i}_${k}" type="number" step="0.5" placeholder="كجم" value="${sg.w}"><input id="r${i}_${k}" type="number" placeholder="تكرار (${g.min}-${g.max})"></div>`;
+  h+=`<div class="card ${done?'done':''}"><div class="ex">${imgTag(id)}<div><h3>${esc(e.name)}</h3><span class="badge">${eqName(e.equipment)}</span><span class="badge">${esc((e.primaryMuscles||[]).join(", "))}</span></div></div>
+  <div class="sug">${esc(sg.msg)}</div>${sg.est?'<div class="warn">هذا تقدير عام وليس قياسًا لقدرتك الفعلية.</div>':''}
+  <div class="last">${l?'آخر مرة ('+l.date+'): '+l.sets.map(x=>x.w+'×'+x.r).join(' | '):''}</div>${rows}
+  <button class="btn" onclick="logEx(${i})">${done?'تحديث اليوم':'حفظ'}</button>
+  <button class="btn g" onclick="chart(${i})">الرسم</button><button class="btn g" onclick="tg('d${i}')">التكنيك</button><button class="btn g" onclick="tg('e${i}')">تعديل</button>
+  <canvas id="c${i}" class="hide"></canvas>
+  <div id="d${i}" class="hide"><ol>${(e.instructions||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ol></div>
+  <div id="e${i}" class="hide"><div class="row"><label>وزن ابتدائي/تكرار</label><input id="a${i}" type="number" step="0.5" value="${s.w0||''}"><input id="b${i}" type="number" value="${s.r0||''}"></div>
+  <div class="row"><label>مجموعات / تكرار من-إلى</label><input id="n${i}" type="number" value="${g.n}"><input id="m${i}" type="number" value="${g.min}"><input id="x${i}" type="number" value="${g.max}"></div>
+  <div class="row"><label>الزيادة (كجم)</label><input id="z${i}" type="number" step="0.5" value="${g.inc}"><select id="dy${i}">${S.days.map(d=>`<option ${d==(s.day||S.days[0])?'selected':''}>${esc(d)}</option>`).join("")}</select></div>
+  <button class="btn" onclick="editEx(${i})">حفظ التعديل</button><button class="btn r" onclick="delEx(${i})">حذف من جدولي</button></div></div>`;
  });
- document.getElementById("app").innerHTML=h;
- for(const k in c)if(document.getElementById(k))document.getElementById(k).value=c[k];
+ $("#app").innerHTML=h;
 }
+const tg=id=>document.getElementById(id).classList.toggle("hide");
 function logEx(i){
- const ex=DEF[S.day][i],sets=[];
- for(let k=0;k<S.cfg.nsets;k++){const w=parseFloat(document.getElementById(`w${i}_${k}`).value),r=parseInt(document.getElementById(`r${i}_${k}`).value);
-  if(w>=0&&r>0)sets.push({w,r});}
+ const id=CUR[i],g=rng(id),sets=[];
+ for(let k=0;k<g.n;k++){const w=parseFloat($(`#w${i}_${k}`).value),r=parseInt($(`#r${i}_${k}`).value);if(w>=0&&r>0)sets.push({w,r})}
  if(!sets.length)return alert("أدخل الوزن والتكرارات");
- S.log[ex]=(S.log[ex]||[]).filter(x=>x.date!==today());S.log[ex].push({date:today(),sets});save();render();
+ S.log[id]=(S.log[id]||[]).filter(x=>x.date!==today());S.log[id].push({date:today(),sets});save();render();
 }
+function editEx(i){
+ const id=CUR[i],s=S.sel[id];
+ s.w0=parseFloat($("#a"+i).value)||0;s.r0=parseInt($("#b"+i).value)||0;s.sets=parseInt($("#n"+i).value)||0;s.rmin=parseInt($("#m"+i).value)||0;s.rmax=parseInt($("#x"+i).value)||0;s.inc=parseFloat($("#z"+i).value)||0;s.day=$("#dy"+i).value;
+ save();render();
+}
+function delEx(i){if(confirm("حذف التمرين من جدولك؟")){delete S.sel[CUR[i]];save();render()}}
 function chart(i){
- const ex=DEF[S.day][i],h=hist(ex),cv=document.getElementById("c"+i);cv.hidden=!cv.hidden;if(cv.hidden||!h.length)return;
+ const id=CUR[i],h=hist(id),cv=document.getElementById("c"+i);cv.classList.toggle("hide");if(cv.classList.contains("hide")||!h.length)return;
  cv.width=cv.clientWidth*2;cv.height=300;const g=cv.getContext("2d");g.scale(2,2);
  const W=cv.clientWidth,H=150,v=h.map(x=>Math.max(...x.sets.map(s=>s.w))),mn=Math.min(...v)-2.5,mx=Math.max(...v)+2.5;
- g.strokeStyle="#e63946";g.lineWidth=2;g.beginPath();
- v.forEach((y,j)=>{const px=h.length>1?20+j*(W-40)/(h.length-1):W/2,py=H-15-(y-mn)/(mx-mn)*(H-30);j?g.lineTo(px,py):g.moveTo(px,py)});g.stroke();
- g.fillStyle="#eee";g.font="11px sans-serif";
- v.forEach((y,j)=>{const px=h.length>1?20+j*(W-40)/(h.length-1):W/2,py=H-15-(y-mn)/(mx-mn)*(H-30);g.fillText(y,px-6,py-6)});
+ const P=j=>[h.length>1?20+j*(W-40)/(h.length-1):W/2,H-15-(v[j]-mn)/(mx-mn)*(H-30)];
+ g.strokeStyle="#e63946";g.lineWidth=2;g.beginPath();v.forEach((y,j)=>{const[p,q]=P(j);j?g.lineTo(p,q):g.moveTo(p,q)});g.stroke();
+ g.fillStyle="#eee";g.font="11px sans-serif";v.forEach((y,j)=>{const[p,q]=P(j);g.fillText(y,p-6,q-6)});
 }
-function saveCfg(){["rmin","rmax","inc","nsets"].forEach(k=>S.cfg[k]=parseFloat(document.getElementById(k).value));save();render();}
-function exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:"application/json"}));a.download="ppl-backup.json";a.click();}
-function importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{S=JSON.parse(r.result);save();render()};r.readAsText(f);}
-render();
+function vMe(){
+ const p=S.profile,c=S.cfg;
+ $("#app").innerHTML=`<div class="card"><h3>بياناتي</h3>
+ <div class="row"><label>الجنس</label><select id="p_sex"><option value="m" ${p.sex=='m'?'selected':''}>ذكر</option><option value="f" ${p.sex=='f'?'selected':''}>أنثى</option></select></div>
+ <div class="row"><label>العمر</label><input id="p_age" type="number" value="${p.age}"></div>
+ <div class="row"><label>الطول (سم)</label><input id="p_h" type="number" value="${p.height}"></div>
+ <div class="row"><label>وزن الجسم (كجم)</label><input id="p_w" type="number" step="0.1" value="${lastBW()}"></div>
+ <div class="muted">BMI = ${BMI().toFixed(1)}. الطول يُستخدم لحساب BMI فقط؛ تأثيره المباشر على قوتك ضعيف، فلا أعتمد عليه في تقدير الأوزان.</div>
+ <button class="btn" onclick="saveMe()">حفظ (وتسجيل وزن اليوم)</button></div>
+ <div class="card"><h3>إعدادات التدريب العامة</h3>
+ <div class="row"><label>أقل تكرار</label><input id="rmin" type="number" value="${c.rmin}"></div><div class="row"><label>أعلى تكرار</label><input id="rmax" type="number" value="${c.rmax}"></div>
+ <div class="row"><label>الزيادة (كجم)</label><input id="inc" type="number" step="0.5" value="${c.inc}"></div><div class="row"><label>عدد المجموعات</label><input id="nsets" type="number" value="${c.nsets}"></div>
+ <button class="btn" onclick="saveCfg()">حفظ</button><button class="btn g" onclick="exportData()">تصدير نسخة</button><button class="btn g" onclick="$('#imp').click()">استيراد</button><input type="file" id="imp" class="hide" onchange="importData(event)"></div>
+ <div class="card"><h3>وزن الجسم</h3><canvas id="bwc"></canvas></div>`;
+ const cv=$("#bwc"),b=S.bw;cv.width=cv.clientWidth*2;cv.height=300;const g=cv.getContext("2d");g.scale(2,2);
+ if(b.length){const W=cv.clientWidth,H=150,v=b.map(x=>x.w),mn=Math.min(...v)-1,mx=Math.max(...v)+1;const P=j=>[b.length>1?20+j*(W-40)/(b.length-1):W/2,H-15-(v[j]-mn)/(mx-mn)*(H-30)];
+ g.strokeStyle="#2a9d8f";g.lineWidth=2;g.beginPath();v.forEach((y,j)=>{const[p,q]=P(j);j?g.lineTo(p,q):g.moveTo(p,q)});g.stroke();g.fillStyle="#eee";g.font="11px sans-serif";v.forEach((y,j)=>{const[p,q]=P(j);g.fillText(y,p-6,q-6)})}
+}
+function saveMe(){
+ const p=S.profile;p.sex=$("#p_sex").value;p.age=+$("#p_age").value||p.age;p.height=+$("#p_h").value||p.height;const w=+$("#p_w").value;
+ if(w){p.weight=w;S.bw=S.bw.filter(x=>x.date!==today());S.bw.push({date:today(),w})}save();render();
+}
+function saveCfg(){["rmin","rmax","inc","nsets"].forEach(k=>S.cfg[k]=parseFloat($("#"+k).value)||S.cfg[k]);save();render()}
+function exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:"application/json"}));a.download="hadeed-backup.json";a.click()}
+function importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{S=JSON.parse(r.result);save();render()};r.readAsText(f)}
+
+/* ---------- InBody ---------- */
+function loadPdfJs(){return new Promise((res,rej)=>{if(window.pdfjsLib)return res();const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";s.onload=()=>{pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";res()};s.onerror=rej;document.head.appendChild(s)})}
+async function readPdf(file){await loadPdfJs();const d=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;let t="";for(let p=1;p<=d.numPages;p++){const pg=await d.getPage(p),c=await pg.getTextContent();t+=c.items.map(i=>i.str).join(" ")+"\n"}return t.replace(/\s+/g," ")}
+const grab=(t,res)=>{for(const r of res){const m=t.match(r);if(m)return parseFloat(m[1])}return ""};
+async function onPdf(ev){
+ const f=ev.target.files[0];if(!f)return;$("#pmsg").textContent="جاري قراءة الملف داخل جهازك...";
+ try{
+  const t=await readPdf(f);
+  const v={weight:grab(t,[/Weight[^\d]{0,25}(\d{2,3}\.?\d*)/i]),smm:grab(t,[/Skeletal Muscle Mass[^\d]{0,30}(\d{2}\.?\d*)/i]),bfm:grab(t,[/Body Fat Mass[^\d]{0,30}(\d{1,2}\.?\d*)/i]),pbf:grab(t,[/Percent Body Fat[^\d]{0,30}(\d{1,2}\.?\d*)/i,/PBF[^\d]{0,20}(\d{1,2}\.?\d*)/]),bmr:grab(t,[/Basal Metabolic Rate[^\d]{0,30}(\d{3,4})/i,/BMR[^\d]{0,20}(\d{3,4})/i])};
+  Object.keys(v).forEach(k=>{if(v[k]!=="")$("#i_"+k).value=v[k]});
+  $("#pmsg").textContent=Object.values(v).some(x=>x!=="")?"تمت القراءة. راجع الأرقام وصحّحها إن لزم قبل التحليل.":"لم أستطع استخراج أرقام (ربما الملف صورة ممسوحة). أدخل القيم يدويًا."
+ }catch(e){$("#pmsg").textContent="تعذرت قراءة الملف. أدخل القيم يدويًا."}
+}
+function vInb(){
+ const b=S.inbody||{};
+ const f=(k,l,u)=>`<div class="row"><label>${l}</label><input id="i_${k}" type="number" step="0.1" value="${b[k]||''}" placeholder="${u||''}"></div>`;
+ $("#app").innerHTML=`<div class="card"><h3>تحليل InBody (اختياري)</h3>
+ <div class="muted">يُقرأ الملف داخل متصفحك ولا يُرفع لأي خادم. القراءة تعتمد على استخراج النص والبحث عن أسماء القيم الإنجليزية، وليست ذكاءً اصطناعيًا توليديًا، وقد تختلف صيغ التقارير، لذلك راجع الأرقام.</div>
+ <input type="file" accept="application/pdf" onchange="onPdf(event)"><div id="pmsg" class="muted"></div>
+ ${f("weight","الوزن (كجم)")}${f("smm","كتلة العضلات الهيكلية SMM (كجم)")}${f("bfm","كتلة الدهون (كجم)")}${f("pbf","نسبة الدهون %")}${f("bmr","BMR (سعرة)")}
+ <div class="muted">كتلة العضلات الخالية للأطراف (اختياري، لكشف عدم التوازن):</div>
+ ${f("ra","الذراع اليمنى")}${f("la","الذراع اليسرى")}${f("rl","الساق اليمنى")}${f("ll","الساق اليسرى")}
+ <div class="row"><label>الهدف</label><select id="i_goal"><option value="auto">تلقائي حسب النتائج</option><option value="fat">خسارة دهون مع حفظ العضل</option><option value="muscle">بناء عضل</option></select></div>
+ <div class="row"><label>أيام التمرين</label><select id="i_days"><option>3</option><option selected>4</option><option>5</option><option>6</option></select></div>
+ <button class="btn" onclick="analyze()">حلّل وابنِ البرنامج</button></div><div id="res"></div>`;
+ if(UI.prog)showProg();
+}
+function analyze(){
+ const g=k=>parseFloat($("#i_"+k).value)||0,p=S.profile,m=p.sex==="m";
+ const b={weight:g("weight"),smm:g("smm"),bfm:g("bfm"),pbf:g("pbf"),bmr:g("bmr"),ra:g("ra"),la:g("la"),rl:g("rl"),ll:g("ll")};
+ if(!b.pbf&&b.bfm&&b.weight)b.pbf=+(b.bfm/b.weight*100).toFixed(1);
+ if(!b.weight&&!b.pbf&&!b.smm)return alert("أدخل على الأقل الوزن ونسبة الدهون أو SMM");
+ S.inbody=b;save();
+ const notes=[];let fat=false,lowMu=false;
+ if(b.pbf){const hi=m?[20,25]:[28,33],lo=m?10:18;
+  if(b.pbf>hi[1]){notes.push(`نسبة الدهون ${b.pbf}% مرتفعة (النطاق الشائع ${m?'10–20':'18–28'}%).`);fat=true}
+  else if(b.pbf>hi[0]){notes.push(`نسبة الدهون ${b.pbf}% أعلى قليلًا من الطبيعي.`);fat=true}
+  else if(b.pbf<lo)notes.push(`نسبة الدهون ${b.pbf}% منخفضة؛ لا تقلل السعرات أكثر.`);
+  else notes.push(`نسبة الدهون ${b.pbf}% ضمن النطاق الطبيعي.`)}
+ if(b.smm&&b.weight){const r=b.smm/b.weight*100,ok=m?40:33,mid=m?35:28;
+  if(r<mid){notes.push(`العضلات الهيكلية ≈ ${r.toFixed(1)}% من الوزن (منخفضة تقريبيًا).`);lowMu=true}
+  else if(r<ok)notes.push(`العضلات الهيكلية ≈ ${r.toFixed(1)}% من الوزن (متوسطة).`);
+  else notes.push(`العضلات الهيكلية ≈ ${r.toFixed(1)}% من الوزن (جيدة).`)}
+ const imb=(a,c,n)=>{if(a&&c){const d=Math.abs(a-c)/Math.max(a,c)*100;if(d>=5)notes.push(`فرق ${d.toFixed(0)}% بين ${n}: ${a<c?'الأيمن':'الأيسر'} أضعف؛ أضفت له عمل أحادي الجانب وابدأ به.`)}};
+ imb(b.ra,b.la,"الذراعين");imb(b.rl,b.ll,"الساقين");
+ if(b.bmr)notes.push(`BMR ≈ ${b.bmr} سعرة؛ احتياجك اليومي التقريبي مع نشاط متوسط ≈ ${Math.round(b.bmr*1.55)} سعرة.`);
+ const bmi=BMI();notes.push(`BMI ≈ ${bmi.toFixed(1)} (لا يفرّق بين العضل والدهون؛ اعتمد أكثر على InBody).`);
+ let goal=$("#i_goal").value;if(goal==="auto")goal=fat&&!lowMu?"fat":"muscle";
+ notes.push(goal==="fat"?"الهدف: خسارة دهون مع حفظ العضل: عجز 300–500 سعرة، بروتين كافٍ، واستمر في رفع أوزان ثقيلة نسبيًا.":"الهدف: بناء عضل: فائض خفيف 200–300 سعرة وتدرّج في الأوزان.");
+ UI.prog=buildProg(+$("#i_days").value,goal,b);UI.notes=notes;showProg();
+}
+const DAYS={
+ Push:[["chest",["bench press"]],["chest",["incline","press"]],["shoulders",["shoulder press"]],["shoulders",["lateral raise"]],["triceps",["pushdown"]],["triceps",["extension"]]],
+ Pull:[["lats",["pulldown"]],["middle back",["row"]],["lats",["pull-up"]],["shoulders",["face pull"]],["biceps",["curl"]],["biceps",["hammer"]]],
+ Legs:[["quadriceps",["squat"]],["hamstrings",["romanian"]],["quadriceps",["leg press"]],["hamstrings",["leg curl"]],["calves",["calf"]],["abdominals",["crunch"]]],
+ Upper:[["chest",["bench press"]],["lats",["pulldown"]],["shoulders",["shoulder press"]],["middle back",["row"]],["biceps",["curl"]],["triceps",["pushdown"]]],
+ Lower:[["quadriceps",["squat"]],["hamstrings",["romanian"]],["quadriceps",["leg press"]],["hamstrings",["leg curl"]],["calves",["calf"]],["abdominals",["crunch"]]],
+ Full:[["quadriceps",["squat"]],["chest",["bench press"]],["lats",["pulldown"]],["shoulders",["lateral raise"]],["hamstrings",["leg curl"]],["biceps",["curl"]],["triceps",["pushdown"]],["abdominals",["crunch"]]]
+};
+function pickEx(slot,used,pref){
+ const [mu,kw]=slot,ok=e=>e.category!=="stretching"&&e.category!=="cardio"&&(e.primaryMuscles||[])[0]===mu&&!used.has(e.id);
+ const pool=DB.filter(ok),has=e=>pref.size===0||pref.has(e.equipment);
+ let c=pool.filter(e=>has(e)&&kw.every(k=>e.name.toLowerCase().includes(k)));
+ if(!c.length)c=pool.filter(e=>kw.every(k=>e.name.toLowerCase().includes(k)));
+ if(!c.length)c=pool.filter(e=>has(e)&&e.mechanic==="compound");
+ if(!c.length)c=pool.filter(has);
+ const order=["barbell","machine","cable","dumbbell"];
+ c.sort((a,b)=>(order.indexOf(a.equipment)<0?9:order.indexOf(a.equipment))-(order.indexOf(b.equipment)<0?9:order.indexOf(b.equipment))||a.name.length-b.name.length);
+ return c[0];
+}
+function buildProg(n,goal,b){
+ const plan={3:["Full","Full","Full"],4:["Upper","Lower","Upper","Lower"],5:["Push","Pull","Legs","Upper","Lower"],6:["Push","Pull","Legs","Push","Pull","Legs"]}[n];
+ const pref=new Set(Object.keys(S.sel).map(id=>BYID[id]&&BYID[id].equipment).filter(Boolean));
+ const days=[],cnt={};
+ plan.forEach((t,i)=>{
+  cnt[t]=(cnt[t]||0)+1;const name=`${i+1}) ${t}${plan.filter(x=>x===t).length>1?" "+"AB"[cnt[t]-1]:""}`;
+  const used=new Set(days.flatMap(d=>d.items.map(x=>x.id)).filter((_,k)=>false));
+  let slots=DAYS[t].slice();if(cnt[t]===2)slots=slots.slice().reverse();
+  const items=[],u=new Set();
+  slots.forEach((s,k)=>{const e=pickEx(s,u,pref);if(!e)return;u.add(e.id);const comp=e.mechanic==="compound"||k<2;
+   items.push({id:e.id,sets:comp?(goal==="muscle"?4:3):3,min:comp?(goal==="fat"?6:6):10,max:comp?10:15,rest:comp?"2–3 د":"60–90 ث"})});
+  days.push({name,items});
+ });
+ return{days,goal};
+}
+function showProg(){
+ const P=UI.prog;if(!P)return;
+ $("#res").innerHTML=`<div class="card"><h3>نتائج التحليل</h3>${(UI.notes||["آخر برنامج مبني محفوظ في الجلسة."]).map(n=>`<div class="sug">• ${esc(n)}</div>`).join("")}<div class="muted">هذا تحليل إرشادي وليس تشخيصًا طبيًا. استشر مختصًا عند وجود حالة صحية.</div></div>
+ ${P.days.map(d=>`<div class="card"><h3>${esc(d.name)}</h3><table><tr><th>التمرين</th><th>المجموعات×التكرار</th><th>الراحة</th></tr>${d.items.map(x=>`<tr><td>${esc(BYID[x.id].name)}<br><span class="badge">${eqName(BYID[x.id].equipment)}</span></td><td>${x.sets}×${x.min}-${x.max}</td><td>${x.rest}</td></tr>`).join("")}</table></div>`).join("")}
+ <button class="btn" onclick="applyProg()">اعتمد هذا البرنامج كجدولي</button>`;
+}
+function applyProg(){
+ if(!confirm("سيستبدل جدولك الحالي (سجلك السابق يبقى محفوظًا). متابعة؟"))return;
+ const P=UI.prog,old=S.sel;S.sel={};S.days=P.days.map(d=>d.name);
+ P.days.forEach(d=>d.items.forEach(x=>{const o=old[x.id]||{};S.sel[x.id]={day:d.name,w0:o.w0||0,r0:o.r0||0,sets:x.sets,rmin:x.min,rmax:x.max}}));
+ S.day=S.days[0];UI.tab="today";save();render();
+}
+render();loadDB();
 </script></body></html>
