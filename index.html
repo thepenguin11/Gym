@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>سجل حديد PPL</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,Tahoma,sans-serif;background:#0f1115;color:#eee}
+header{padding:14px;text-align:center;font-size:20px;font-weight:700;background:#171a21}
+.tabs{display:flex;gap:6px;padding:10px}.tabs button{flex:1;padding:12px;border:0;border-radius:10px;background:#222733;color:#eee;font-size:16px}
+.tabs button.on{background:#e63946}
+main{padding:0 10px 40px;max-width:640px;margin:auto}
+.card{background:#171a21;border-radius:14px;padding:12px;margin:10px 0}
+.card h3{margin:0 0 4px}.sug{color:#7bdc8b;font-size:14px;margin-bottom:8px}.last{color:#999;font-size:13px}
+.row{display:flex;gap:6px;align-items:center;margin:5px 0}.row span{width:24px;color:#999}
+input{width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#0f1115;color:#eee;font-size:16px}
+.btn{padding:10px 14px;border:0;border-radius:10px;background:#2a9d8f;color:#fff;font-size:15px;margin-top:6px}
+.btn.g{background:#333}.done{opacity:.55}
+canvas{width:100%;height:150px;background:#0f1115;border-radius:8px;margin-top:8px}
+.top{display:flex;gap:6px;flex-wrap:wrap}
+</style></head><body>
+<header>🏋️ سجل التمارين – PPL</header>
+<div class="tabs" id="tabs"></div>
+<main id="app"></main>
+<main>
+<div class="card"><b>الإعدادات</b>
+<div class="row"><label>الحد الأدنى للتكرار</label><input id="rmin" type="number"></div>
+<div class="row"><label>الحد الأعلى للتكرار</label><input id="rmax" type="number"></div>
+<div class="row"><label>الزيادة (كجم)</label><input id="inc" type="number" step="0.5"></div>
+<div class="row"><label>عدد المجموعات</label><input id="nsets" type="number"></div>
+<div class="top"><button class="btn" onclick="saveCfg()">حفظ الإعدادات</button>
+<button class="btn g" onclick="exportData()">تصدير نسخة</button>
+<button class="btn g" onclick="document.getElementById('imp').click()">استيراد</button>
+<input type="file" id="imp" hidden onchange="importData(event)"></div></div>
+</main>
+<script>
+const DEF={
+Push:["Bench Press","Incline Dumbbell Press","Shoulder Press","Lateral Raise","Triceps Pushdown","Overhead Triceps Extension"],
+Pull:["Lat Pulldown","Barbell Row","Seated Cable Row","Face Pull","Barbell Curl","Hammer Curl"],
+Legs:["Squat","Romanian Deadlift","Leg Press","Leg Curl","Leg Extension","Calf Raise"]};
+const AR={Push:"دفع",Pull:"سحب",Legs:"أرجل"};
+let S=JSON.parse(localStorage.getItem("ppl")||"null")||{cfg:{rmin:8,rmax:12,inc:2.5,nsets:3},log:{},day:"Push"};
+const save=()=>localStorage.setItem("ppl",JSON.stringify(S));
+const today=()=>new Date().toISOString().slice(0,10);
+function hist(ex){return (S.log[ex]||[]).slice().sort((a,b)=>a.date<b.date?-1:1)}
+function suggest(ex){
+ const h=hist(ex).filter(x=>x.date!==today());const c=S.cfg;
+ if(!h.length)return{w:"",msg:"أول مرة: ابدأ بوزن تقدر تعمل به "+c.rmin+" تكرارات بشكل نظيف"};
+ const l=h[h.length-1],sets=l.sets,w=Math.max(...sets.map(s=>s.w));
+ const top=sets.filter(s=>s.w===w);
+ if(top.every(s=>s.r>=c.rmax))return{w:w+c.inc,msg:`زد الوزن إلى ${w+c.inc} كجم (وصلت ${c.rmax} في كل المجموعات)`};
+ if(top.some(s=>s.r<c.rmin)&&top.filter(s=>s.r<c.rmin).length>=2)return{w:w,msg:`ثبّت على ${w} كجم وحاول توصل ${c.rmin}+ في كل مجموعة`};
+ return{w:w,msg:`ابقَ على ${w} كجم وحاول ترفع التكرارات حتى ${c.rmax}`};
+}
+function render(){
+ document.getElementById("tabs").innerHTML=Object.keys(DEF).map(d=>`<button class="${S.day==d?'on':''}" onclick="S.day='${d}';save();render()">${AR[d]} (${d})</button>`).join("");
+ const c=S.cfg;let h="";
+ DEF[S.day].forEach((ex,i)=>{
+  const sg=suggest(ex),l=hist(ex).slice(-1)[0];
+  const done=(S.log[ex]||[]).some(x=>x.date===today());
+  let rows="";for(let k=0;k<c.nsets;k++)rows+=`<div class="row"><span>${k+1}</span><input id="w${i}_${k}" type="number" step="0.5" placeholder="كجم" value="${sg.w}"><input id="r${i}_${k}" type="number" placeholder="تكرار (${c.rmin}-${c.rmax})"></div>`;
+  h+=`<div class="card ${done?'done':''}"><h3>${ex}</h3><div class="sug">${sg.msg}</div>
+  <div class="last">${l?'آخر مرة ('+l.date+'): '+l.sets.map(s=>s.w+'×'+s.r).join(' | '):''}</div>
+  ${rows}<button class="btn" onclick="logEx(${i})">${done?'تحديث اليوم':'حفظ'}</button>
+  <button class="btn g" onclick="chart(${i})">الرسم</button><canvas id="c${i}" hidden></canvas></div>`;
+ });
+ document.getElementById("app").innerHTML=h;
+ for(const k in c)if(document.getElementById(k))document.getElementById(k).value=c[k];
+}
+function logEx(i){
+ const ex=DEF[S.day][i],sets=[];
+ for(let k=0;k<S.cfg.nsets;k++){const w=parseFloat(document.getElementById(`w${i}_${k}`).value),r=parseInt(document.getElementById(`r${i}_${k}`).value);
+  if(w>=0&&r>0)sets.push({w,r});}
+ if(!sets.length)return alert("أدخل الوزن والتكرارات");
+ S.log[ex]=(S.log[ex]||[]).filter(x=>x.date!==today());S.log[ex].push({date:today(),sets});save();render();
+}
+function chart(i){
+ const ex=DEF[S.day][i],h=hist(ex),cv=document.getElementById("c"+i);cv.hidden=!cv.hidden;if(cv.hidden||!h.length)return;
+ cv.width=cv.clientWidth*2;cv.height=300;const g=cv.getContext("2d");g.scale(2,2);
+ const W=cv.clientWidth,H=150,v=h.map(x=>Math.max(...x.sets.map(s=>s.w))),mn=Math.min(...v)-2.5,mx=Math.max(...v)+2.5;
+ g.strokeStyle="#e63946";g.lineWidth=2;g.beginPath();
+ v.forEach((y,j)=>{const px=h.length>1?20+j*(W-40)/(h.length-1):W/2,py=H-15-(y-mn)/(mx-mn)*(H-30);j?g.lineTo(px,py):g.moveTo(px,py)});g.stroke();
+ g.fillStyle="#eee";g.font="11px sans-serif";
+ v.forEach((y,j)=>{const px=h.length>1?20+j*(W-40)/(h.length-1):W/2,py=H-15-(y-mn)/(mx-mn)*(H-30);g.fillText(y,px-6,py-6)});
+}
+function saveCfg(){["rmin","rmax","inc","nsets"].forEach(k=>S.cfg[k]=parseFloat(document.getElementById(k).value));save();render();}
+function exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:"application/json"}));a.download="ppl-backup.json";a.click();}
+function importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{S=JSON.parse(r.result);save();render()};r.readAsText(f);}
+render();
+</script></body></html>
